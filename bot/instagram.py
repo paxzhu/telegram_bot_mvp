@@ -1,9 +1,8 @@
 import json, pathlib, random
 
-_FAKE_POSTS = json.loads(
-    pathlib.Path(__file__).with_suffix("").parent / "data" / "fake_posts.json"
-        .read_text(encoding="utf-8")
-)
+# 构建数据文件路径
+data_file = pathlib.Path(__file__).parent / "data" / "fake_posts.json"
+_FAKE_POSTS = json.loads(data_file.read_text(encoding="utf-8"))
 
 def summarize(username: str) -> str | None:
     """

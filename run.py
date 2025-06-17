@@ -5,7 +5,10 @@ from telegram.ext import Application
 from bot.handlers import build_handlers
 
 load_dotenv()
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 def main() -> None:
     token = os.getenv("BOT_TOKEN")
@@ -13,8 +16,13 @@ def main() -> None:
         raise RuntimeError("Missing BOT_TOKEN in .env")
 
     app = Application.builder().token(token).build()
-    build_handlers(app)          # 注册所有路由
-    app.run_polling()            # 长轮询最快捷
+    build_handlers(app)          
+    
+    logger = logging.getLogger(__name__)
+    logger.info("Bot is starting...")
+    logger.info("Using Telegram API for long polling")
+    
+    app.run_polling()            
 
 if __name__ == "__main__":
     main()

@@ -6,6 +6,8 @@ from telegram.ext import (
     filters, ContextTypes, Application
 )
 from . import instagram, memory
+import logging
+logger = logging.getLogger(__name__)
 
 CHECK, STORY = "CHECK", "STORY"   # CallbackData / user_data mode keys
 
@@ -42,7 +44,9 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     # 默认为 STORY
     img_path = memory.generate_image_path(text)
-    await update.message.reply_photo(
-        photo=InputFile(img_path),
-        caption="示例图（假数据）"
-    )
+    logger.info(f"Generated image path: {img_path}")
+    with open(img_path, 'rb') as photo:
+        await update.message.reply_photo(
+            photo=InputFile(photo),
+            caption="示例图（假数据）"
+        )
