@@ -7,7 +7,8 @@ from typing import Union
 from tg_bot.states import Form
 from tg_bot.core import memory_to_image
 from tg_bot.utils import guard_errors
-from tg_bot.keyboards import main_menu
+from tg_bot.keyboards import build_main_menu
+from tg_bot.i18n import tr
 
 router = Router()
 
@@ -15,7 +16,7 @@ router = Router()
 @guard_errors
 async def memory_menu(call: CallbackQuery, state: FSMContext):
     await state.set_state(Form.waiting_for_memory)
-    await call.message.answer("请描述一段回忆，我会为你生成写实图像：")
+    await call.message.answer(tr("ask_memory", call.from_user.language_code))
     await call.answer()
 
 @router.message(Form.waiting_for_memory)
@@ -23,7 +24,7 @@ async def memory_menu(call: CallbackQuery, state: FSMContext):
 async def process_memory(message: Message, state: FSMContext):
     text = (message.text or "").strip()
     if not text:
-        await message.answer("⚠️ 描述不能为空，请重新输入。")
+        await message.answer(tr("empty_memory_description", message.from_user.language_code))
         return
     
     await message.bot.send_chat_action(
@@ -32,16 +33,15 @@ async def process_memory(message: Message, state: FSMContext):
     )
 
     try:
-        result: Union[bytes, str] = await memory_to_image(text)
+        img_path = await memory_to_image(text)
     except Exception:
-        await message.answer("❌ 图像生成失败，请稍后重试。", reply_markup=main_menu)
+        await message.answer(tr("image_generation_failed", message.from_user.language_code))
         await state.clear()
         return
 
-    if isinstance(result, (bytes, bytearray)):
-        photo = BufferedInputFile(result, filename="memory.jpg")
-    else:
-        photo = FSInputFile(result)
-
-    await message.answer_photo(photo, caption="✨ 你的回忆图像已生成", reply_markup=main_menu)
+    await message.answer_photo(
+        FSInputFile(img_path),
+        caption=tr("your_memory_img", message.from_user.language_code),
+        reply_markup=build_main_menu(message.from_user.language_code),
+    )
     await state.clear()

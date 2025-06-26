@@ -63,16 +63,17 @@ async def fetch_posts(username: str, limit: int = 3) -> List[str]:
 # ------------------------------------------------------------------
 # 摘要生成
 # ------------------------------------------------------------------
-async def summarize(captions: List[str]) -> str:
+async def summarize(captions: List[str], lang_code: str = 'English') -> str:
     if not captions:
         return "未获取到任何动态内容"
 
     prompt = (
-        "你是一个擅长社交媒体内容分析的小助手。"
-        "请根据以下 Instagram 动态，用一句自然、简洁的中文总结近况。\n\n"
-        "Instagram 动态：\n" + "\n".join(f"- {c}" for c in captions)
+        "You are an assistant skilled in analyzing social media content. "
+        "Please summarize the recent statuses based on the following Instagram posts "
+        f"and respond in one natural, concise {lang_code} sentence. \n\n"
+        "Instagram posts: \n" + "\n".join(f"- {c}" for c in captions)
     )
-
+    logger.info("Prompt 生成", prompt=prompt)
     loop = asyncio.get_running_loop()
     try:
         rsp = await loop.run_in_executor(None, _text_model.generate_content, prompt)

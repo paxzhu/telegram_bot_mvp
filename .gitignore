@@ -37,3 +37,6 @@ Thumbs.db
 
 # Test files
 tests/ 
+
+# User-generated content
+tg_bot/generated_images/
