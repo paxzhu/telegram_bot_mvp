@@ -12,7 +12,7 @@ from pathlib import Path
 from apify_client import ApifyClient
 import google.generativeai as genai
 import openai
-from tg_bot.config import APIFY_TOKEN, GOOGLE_API_KEY, STABILITY_API_KEY, OPENAI_API_KEY
+from tg_bot.config import APIFY_TOKEN, GOOGLE_API_KEY, OPENAI_API_KEY
 from tg_bot.exceptions import APIError
 
 logger = structlog.get_logger("core")
@@ -94,48 +94,90 @@ async def summarize(captions: List[str], lang_code: str = 'English') -> str:
 # LLM 系统提示词：Creative Director
 # ---------------------------------------------------------------------
 _CREATIVE_SYS_PROMPT = """
-You are a VISUAL-SCENE CREATIVE DIRECTOR.
+你是一位顶级的提示语工程师，你的唯一任务是为图像生成模型DALL-E 3创建超级写实 (Hyper-realistic) 的提示语。
 
-⬇️  Task
-Read the user’s memory (any language) and output JSON with EXACTLY two keys:
-  "prompt"          — ≤120 English words, richly describes subjects, setting, emotions, style
-  "negative_prompt" — ONLY lists VISUAL or TECHNICAL flaws to avoid
+你会收到一段由日本老年人以第一人称“我”叙述的、简短的日文个人回忆。请严格遵循我给出的范例，将其转换成一个旨在生成照片般逼真图像的英文提示语。最终图像必须看起来像真实拍摄的照片，采用第三人称观察者视角，能够完整地展现人物、情感和环境，而不仅仅是展示物体或动作。
 
-✅  Allowed in negative_prompt
-duplicate subjects, extra or missing objects, blur, low-res, watermark, text, harsh shadows,
-modern or urban background (if not in memory), disfigured anatomy, cropped faces.
+**你的输出规则：**
+1.  最终的回答**必须是一个纯粹的JSON对象**。
+2.  **回答必须以 `{` 字符开始，并以 `}` 字符结束。**
+3.  **绝对不要在JSON的外部添加 ```json 或 ``` 这样的Markdown标记。** 这是一个严格的禁令。
+4.  该JSON对象**必须只包含** `positive_prompt` 和 `negative_prompt` 这两个键。
+5.  **请特别注意**回忆中提到的时代背景（如昭和、70年代等），并在`positive_prompt`中融入该时代特有的服装、建筑、物品和氛围，以增强真实感。
 
-❌  Not allowed in negative_prompt
-any emotions or abstract concepts (sadness, death, happiness, fear, nostalgia, gloomy, dark).
+请严格学习并模仿以下范例的转换模式：
 
-💡  Tips
-1. Preserve every detail the user gives (who, what, where, age, era, symbolic objects).
-2. Subtle feelings (nostalgia, bittersweet) belong INSIDE "prompt", not in "negative_prompt".
-3. Do not invent extra fruit, people, or modern items unless user mentioned them.
-4. Output valid JSON only, no markdown, no extra keys.
+---
+
+**【范例1】**
+
+* **输入回忆 (Input):**
+    `私が子どもの頃は、粉ミルクの給食をアルミのお盆で食べてたんだよ。`
+* **输出JSON (Output):**
+    ```json
+    {
+      "positive_prompt": "Photorealistic, nostalgic, Showa-era photograph of a Japanese school lunch. In a classroom with authentic wooden floors and desks from the 1950s, a young child wearing simple, period-appropriate clothing is sitting and eating from a worn aluminum tray, with powdered milk served. The lighting is soft and natural. The atmosphere is quiet and simple. 35mm film photo style, with subtle grain.",
+      "negative_prompt": "ugly, deformed, noisy, blurry, distorted, low resolution, signature, watermark, text, anime, cartoon, 3D render, painting, drawing, CGI, unnatural, modern elements."
+    }
+    ```
+
+---
+
+**【范例2】**
+
+* **输入回忆 (Input):**
+    `学生時代、私はデモに参加し、政治について熱く語り合ったものです。`
+* **输出JSON (Output):**
+    ```json
+    {
+      "positive_prompt": "An authentic, photorealistic black and white photograph capturing the fervor of student protests in 1970s Japan. A group of young students with determined, realistic faces and period-specific hairstyles and clothing are marching together on a city street. The image must have a high-contrast, grainy texture, as if shot on vintage high-speed film, evoking a sense of historical significance.",
+      "negative_prompt": "ugly, deformed, noisy, blurry, distorted, low resolution, signature, watermark, text, anime, cartoon, 3D render, painting, drawing, CGI, unnatural, color, modern vehicles."
+    }
+    ```
+
+---
+
+**【范例3】**
+
+* **输入回忆 (Input):**
+    `孫が遊びに来るときは、いつも「たべっ子どうぶつ」を準備して待っているんです。`
+* **输出JSON (Output):**
+    ```json
+    {
+      "positive_prompt": "A warm, heartwarming, and extremely photorealistic photo capturing a precious family moment in a cozy Japanese living room. An elderly grandparent, with a gentle and loving expression on their face, is sitting at a low table. They are carefully arranging 'Tabekko Doubutsu' animal biscuits onto a small plate. Leaning on the table right next to them, two small grandchildren watch with excitement and joyful anticipation. The room is bathed in warm afternoon sunlight. The image must look like a real, high-quality photograph, rich in authentic detail and emotion.",
+      "negative_prompt": "ugly, deformed, noisy, blurry, distorted, grainy, low resolution, signature, watermark, text, anime, cartoon, 3D render, painting, drawing, CGI, unnatural."
+    }
+    ```
+
+---
+
+现在，你已经学习了如何生成包含时代背景、正负提示语的JSON对象。请严格按照上面的范例，处理我提供的新回忆。
+
+**【新的输入回忆】**
+
 """
 # 允许的负面关键词白名单
-_ALLOWED_NEG = {
-    "duplicate", "extra", "blur", "blurry", "low", "lowres", "low-res",
-    "text", "watermark", "signature", "harsh", "shadow", "urban",
-    "modern", "cropped", "disfigured", "deformed", "multiple"
-}
+# _ALLOWED_NEG = {
+#     "duplicate", "extra", "blur", "blurry", "low", "lowres", "low-res",
+#     "text", "watermark", "signature", "harsh", "shadow", "urban",
+#     "modern", "cropped", "disfigured", "deformed", "multiple"
+# }
 
-def _sanitize_negative(raw_neg: str) -> str:
-    """
-    只保留视觉/技术缺陷相关的词。
-    """
-    if not raw_neg:
-        return ""
-    out = []
-    for part in raw_neg.split(","):
-        token = part.strip().lower()
-        if any(tok in token for tok in _ALLOWED_NEG):
-            out.append(token)
-    return ", ".join(out)
+# def _sanitize_negative(raw_neg: str) -> str:
+#     """
+#     只保留视觉/技术缺陷相关的词。
+#     """
+#     if not raw_neg:
+#         return ""
+#     out = []
+#     for part in raw_neg.split(","):
+#         token = part.strip().lower()
+#         if any(tok in token for tok in _ALLOWED_NEG):
+#             out.append(token)
+#     return ", ".join(out)
 
 # ---------------------------------------------------------------------
-# 1) 把记忆文本 → prompt / negative_prompt
+# 1) 把记忆文本 → positive_prompt / negative_prompt
 # ---------------------------------------------------------------------
 async def _craft_prompts(memory_text: str) -> Dict[str, str]:
     loop = asyncio.get_running_loop()
@@ -206,14 +248,15 @@ async def memory_to_image(memory_text: str, *, n: int = 1,
     高层接口：输入记忆文本 → 返回首张图片本地路径
     """
     prompts = await _craft_prompts(memory_text)
-    pos_prompt = prompts.get("prompt", "")
-    neg_prompt = _sanitize_negative(prompts.get("negative_prompt", ""))
+    pos_prompt = prompts.get("positive_prompt", "")
+    neg_prompt = prompts.get("negative_prompt", "")
+    # neg_prompt = _sanitize_negative(prompts.get("negative_prompt", ""))
     images = await _generate_image(pos_prompt, neg_prompt, n=n, size=size)
 
     if not images:
         raise APIError("生成图像失败，请稍后再试。")
 
-    logger.info("Image generated", prompt=pos_prompt, negative_prompt=neg_prompt)
+    logger.info("Image generated", positive_prompt=pos_prompt, negative_prompt=neg_prompt)
     return images[0]           # 仅返回第一张
 
 __all__ = [
