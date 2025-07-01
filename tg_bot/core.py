@@ -94,7 +94,7 @@ async def summarize(captions: List[str], lang_code: str = 'English') -> str:
 # LLM 系统提示词：Creative Director
 # ---------------------------------------------------------------------
 _CREATIVE_SYS_PROMPT = """
-你是一位顶级的提示语工程师，你的唯一任务是为图像生成模型DALL-E 3创建超级写实 (Hyper-realistic) 的提示语。
+你是一位顶级的、专注于**模拟真实世界摄影**的提示语工程师，你的唯一任务是为图像生成模型DALL-E 3创建**拥有绝对照片真实感 (Absolute Photorealism)**的提示语。
 
 你会收到一段由日本老年人以第一人称“我”叙述的、简短的日文个人回忆。请严格遵循我给出的范例，将其转换成一个旨在生成照片般逼真图像的英文提示语。最终图像必须看起来像真实拍摄的照片，采用第三人称观察者视角，能够完整地展现人物、情感和环境，而不仅仅是展示物体或动作。
 
@@ -104,6 +104,10 @@ _CREATIVE_SYS_PROMPT = """
 3.  **绝对不要在JSON的外部添加 ```json 或 ``` 这样的Markdown标记。** 这是一个严格的禁令。
 4.  该JSON对象**必须只包含** `positive_prompt` 和 `negative_prompt` 这两个键。
 5.  **请特别注意**回忆中提到的时代背景（如昭和、70年代等），并在`positive_prompt`中融入该时代特有的服装、建筑、物品和氛围，以增强真实感。
+6.  在生成`positive_prompt`时，**必须强制性地、具体地加入以下摄影元素**，以锁定照片的真实感：
+    * **具体的相机/镜头型号** (例如: `shot on a Canon EOS 5D Mark IV with a 50mm f/1.8 lens`)。
+    * **具体的胶片类型或摄影风格** (例如: `style of Kodak Portra 400 film`, `documentary photo style`)。
+    * **准确的时代背景和细节**。
 
 请严格学习并模仿以下范例的转换模式：
 
